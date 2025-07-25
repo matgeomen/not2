@@ -20,10 +20,12 @@ class GoogleSheetsService {
     try {
       const range = `${SHEET_NAME}!A:H`;
       const response = await fetch(
-        `${this.baseUrl}/values/${range}?key=${API_KEY}`
+        `${this.baseUrl}/values/${range}?key=${API_KEY}&majorDimension=ROWS`
       );
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -31,19 +33,21 @@ class GoogleSheetsService {
       const rows = data.values || [];
       
       // Skip header row and convert to objects
-      return rows.slice(1).map((row: string[]) => ({
-        id: row[0] || '',
-        title: row[1] || '',
-        content: row[2] || '',
-        category: row[3] || '',
-        tags: row[4] || '',
-        createdAt: row[5] || '',
-        updatedAt: row[6] || '',
-        isPinned: row[7] || 'false'
-      }));
+      return rows.slice(1)
+        .filter((row: string[]) => row && row[0]) // Filter out empty rows
+        .map((row: string[]) => ({
+          id: row[0] || '',
+          title: row[1] || '',
+          content: row[2] || '',
+          category: row[3] || 'Genel',
+          tags: row[4] || '',
+          createdAt: row[5] || new Date().toISOString(),
+          updatedAt: row[6] || new Date().toISOString(),
+          isPinned: row[7] || 'false'
+        }));
     } catch (error) {
       console.error('Error fetching notes:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -62,7 +66,7 @@ class GoogleSheetsService {
       ]];
 
       const response = await fetch(
-        `${this.baseUrl}/values/${range}:append?valueInputOption=RAW&key=${API_KEY}`,
+        `${this.baseUrl}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&key=${API_KEY}`,
         {
           method: 'POST',
           headers: {
@@ -74,7 +78,13 @@ class GoogleSheetsService {
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Add note error:', errorData);
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Error adding note:', error);
       return false;
@@ -88,7 +98,7 @@ class GoogleSheetsService {
       const rowIndex = notes.findIndex(note => note.id === noteId);
       
       if (rowIndex === -1) {
-        console.error('Note not found');
+        console.error('Note not found for update');
         return false;
       }
 
@@ -108,7 +118,7 @@ class GoogleSheetsService {
       ]];
 
       const response = await fetch(
-        `${this.baseUrl}/values/${range}?valueInputOption=RAW&key=${API_KEY}`,
+        `${this.baseUrl}/values/${range}?valueInputOption=USER_ENTERED&key=${API_KEY}`,
         {
           method: 'PUT',
           headers: {
@@ -120,7 +130,13 @@ class GoogleSheetsService {
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Update note error:', errorData);
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Error updating note:', error);
       return false;
@@ -134,12 +150,16 @@ class GoogleSheetsService {
       const rowIndex = notes.findIndex(note => note.id === noteId);
       
       if (rowIndex === -1) {
-        console.error('Note not found');
+        console.error('Note not found for deletion');
         return false;
       }
 
       // Row index + 2 (1 for 0-based to 1-based, 1 for header row)
       const actualRowIndex = rowIndex + 2;
+      
+      // Get sheet ID first
+      const sheetInfo = await this.getSheetInfo();
+      const sheetId = sheetInfo?.sheetId || 0;
       
       const response = await fetch(
         `${this.baseUrl}:batchUpdate?key=${API_KEY}`,
@@ -152,7 +172,7 @@ class GoogleSheetsService {
             requests: [{
               deleteDimension: {
                 range: {
-                  sheetId: 0, // Assuming first sheet
+                  sheetId: sheetId,
                   dimension: 'ROWS',
                   startIndex: actualRowIndex - 1, // 0-based for API
                   endIndex: actualRowIndex
@@ -163,10 +183,36 @@ class GoogleSheetsService {
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Delete note error:', errorData);
+        return false;
+      }
+
+      return true;
     } catch (error) {
       console.error('Error deleting note:', error);
       return false;
+    }
+  }
+
+  async getSheetInfo(): Promise<{ sheetId: number } | null> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}?key=${API_KEY}&fields=sheets(properties(sheetId,title))`
+      );
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      const sheet = data.sheets?.find((s: any) => s.properties.title === SHEET_NAME);
+      
+      return sheet ? { sheetId: sheet.properties.sheetId } : null;
+    } catch (error) {
+      console.error('Error getting sheet info:', error);
+      return null;
     }
   }
 
@@ -178,14 +224,19 @@ class GoogleSheetsService {
         `${this.baseUrl}/values/${range}?key=${API_KEY}`
       );
       
+      if (!response.ok) {
+        console.error('Error checking sheet headers');
+        return false;
+      }
+      
       const data = await response.json();
       
       // If no data or headers don't match, initialize
-      if (!data.values || data.values.length === 0) {
-        const headers = [['ID', 'Title', 'Content', 'Category', 'Tags', 'CreatedAt', 'UpdatedAt', 'IsPinned']];
+      if (!data.values || data.values.length === 0 || !this.hasValidHeaders(data.values[0])) {
+        const headers = [['ID', 'Başlık', 'İçerik', 'Kategori', 'Etiketler', 'Oluşturulma', 'Güncellenme', 'Sabitlenmiş']];
         
         const initResponse = await fetch(
-          `${this.baseUrl}/values/${range}?valueInputOption=RAW&key=${API_KEY}`,
+          `${this.baseUrl}/values/${range}?valueInputOption=USER_ENTERED&key=${API_KEY}`,
           {
             method: 'PUT',
             headers: {
@@ -197,12 +248,44 @@ class GoogleSheetsService {
           }
         );
         
-        return initResponse.ok;
+        if (!initResponse.ok) {
+          console.error('Error initializing sheet headers');
+          return false;
+        }
       }
       
       return true;
     } catch (error) {
       console.error('Error initializing sheet:', error);
+      return false;
+    }
+  }
+
+  private hasValidHeaders(headers: string[]): boolean {
+    const expectedHeaders = ['ID', 'Başlık', 'İçerik', 'Kategori', 'Etiketler', 'Oluşturulma', 'Güncellenme', 'Sabitlenmiş'];
+    return headers.length >= 8 && (
+      headers[0] === 'ID' || 
+      headers[0] === 'id' ||
+      expectedHeaders.some(h => headers.includes(h))
+    );
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}?key=${API_KEY}&fields=properties(title)`
+      );
+      
+      if (!response.ok) {
+        console.error('Connection test failed:', response.status);
+        return false;
+      }
+      
+      const data = await response.json();
+      console.log('Connected to spreadsheet:', data.properties?.title);
+      return true;
+    } catch (error) {
+      console.error('Connection test error:', error);
       return false;
     }
   }

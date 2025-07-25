@@ -34,6 +34,12 @@ export const useGoogleSheets = () => {
       setLoading(true);
       setError(null);
       
+      // Test connection first
+      const connectionOk = await googleSheetsService.testConnection();
+      if (!connectionOk) {
+        throw new Error('Google Sheets bağlantısı kurulamadı. Lütfen internet bağlantınızı kontrol edin.');
+      }
+      
       // Initialize sheet if needed
       await googleSheetsService.initializeSheet();
       
@@ -41,7 +47,8 @@ export const useGoogleSheets = () => {
       const convertedNotes = gsNotes.map(convertFromGoogleSheets);
       setNotes(convertedNotes);
     } catch (err) {
-      setError('Notlar yüklenirken hata oluştu');
+      const errorMessage = err instanceof Error ? err.message : 'Notlar yüklenirken hata oluştu';
+      setError(errorMessage);
       console.error('Error loading notes:', err);
     } finally {
       setLoading(false);
