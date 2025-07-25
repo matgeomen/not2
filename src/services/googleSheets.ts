@@ -1,5 +1,5 @@
 // Google Apps Script Web App URL - Bu URL'yi Google Apps Script'ten alacağız
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzGt5tFG0biXxQ3WwoJ_NJe7lTMA9WMEliaEq_tygLRp1LFn7rubddmsI43UOziZsfXtA/exec';
+const WEB_APP_URL = '';
 
 export interface GoogleSheetsNote {
   id: string;
@@ -15,7 +15,17 @@ export interface GoogleSheetsNote {
 class GoogleSheetsService {
   private webAppUrl = WEB_APP_URL;
 
+  private isValidUrl(): boolean {
+    return this.webAppUrl && 
+           this.webAppUrl.startsWith('https://script.google.com/macros/s/') && 
+           this.webAppUrl.endsWith('/exec');
+  }
+
   async getAllNotes(): Promise<GoogleSheetsNote[]> {
+    if (!this.isValidUrl()) {
+      throw new Error('Google Apps Script Web App URL ayarlanmamış. Lütfen README talimatlarını takip edin.');
+    }
+
     try {
       const response = await fetch(`${this.webAppUrl}?action=getAllNotes`, {
         method: 'GET',
@@ -25,10 +35,17 @@ class GoogleSheetsService {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
       }
       
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
       
       if (data.error) {
         throw new Error(data.error);
@@ -42,6 +59,10 @@ class GoogleSheetsService {
   }
 
   async addNote(note: GoogleSheetsNote): Promise<boolean> {
+    if (!this.isValidUrl()) {
+      throw new Error('Google Apps Script Web App URL ayarlanmamış. Lütfen README talimatlarını takip edin.');
+    }
+
     try {
       const response = await fetch(this.webAppUrl, {
         method: 'POST',
@@ -55,10 +76,17 @@ class GoogleSheetsService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
       
       if (data.error) {
         console.error('Add note error:', data.error);
@@ -73,6 +101,10 @@ class GoogleSheetsService {
   }
 
   async updateNote(noteId: string, updatedNote: GoogleSheetsNote): Promise<boolean> {
+    if (!this.isValidUrl()) {
+      throw new Error('Google Apps Script Web App URL ayarlanmamış. Lütfen README talimatlarını takip edin.');
+    }
+
     try {
       const response = await fetch(this.webAppUrl, {
         method: 'POST',
@@ -87,10 +119,17 @@ class GoogleSheetsService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
       
       if (data.error) {
         console.error('Update note error:', data.error);
@@ -105,6 +144,10 @@ class GoogleSheetsService {
   }
 
   async deleteNote(noteId: string): Promise<boolean> {
+    if (!this.isValidUrl()) {
+      throw new Error('Google Apps Script Web App URL ayarlanmamış. Lütfen README talimatlarını takip edin.');
+    }
+
     try {
       const response = await fetch(this.webAppUrl, {
         method: 'POST',
@@ -118,10 +161,17 @@ class GoogleSheetsService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
       
       if (data.error) {
         console.error('Delete note error:', data.error);
@@ -136,6 +186,10 @@ class GoogleSheetsService {
   }
 
   async initializeSheet(): Promise<boolean> {
+    if (!this.isValidUrl()) {
+      throw new Error('Google Apps Script Web App URL ayarlanmamış. Lütfen README talimatlarını takip edin.');
+    }
+
     try {
       const response = await fetch(this.webAppUrl, {
         method: 'POST',
@@ -148,10 +202,17 @@ class GoogleSheetsService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, response: ${text.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
       
       if (data.error) {
         console.error('Initialize sheet error:', data.error);
@@ -166,6 +227,11 @@ class GoogleSheetsService {
   }
 
   async testConnection(): Promise<boolean> {
+    if (!this.isValidUrl()) {
+      console.error('Google Apps Script Web App URL ayarlanmamış');
+      return false;
+    }
+
     try {
       const response = await fetch(`${this.webAppUrl}?action=testConnection`, {
         method: 'GET',
@@ -175,11 +241,19 @@ class GoogleSheetsService {
       });
       
       if (!response.ok) {
-        console.error('Connection test failed:', response.status);
+        const text = await response.text();
+        console.error('Connection test failed:', response.status, text.substring(0, 200));
         return false;
       }
       
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Invalid JSON response:', text.substring(0, 200));
+        return false;
+      }
       
       if (data.error) {
         console.error('Connection test error:', data.error);
