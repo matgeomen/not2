@@ -1,5 +1,5 @@
 // Google Apps Script Web App URL - Bu URL'yi Google Apps Script'ten alacağız
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzGt5tFG0biXxQ3WwoJ_NJe7lTMA9WMEliaEq_tygLRp1LFn7rubddmsI43UOziZsfXtA/exec';
+const WEB_APP_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
 
 export interface GoogleSheetsNote {
   id: string;
